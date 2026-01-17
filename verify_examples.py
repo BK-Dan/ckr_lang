@@ -4,17 +4,17 @@ import os
 
 CHECKS = [
     {
-        "file": "hello_world.ckr",
+        "file": "examples/hello_world.ckr",
         "expected_snippet": "Hello World",
         "description": "Basic Hello World"
     },
     {
-        "file": "hello_fun_world.ckr",
+        "file": "examples/hello_fun_world.ckr",
         "expected_snippet": "Hello World",
         "description": "Rectangular Hello World"
     },
     {
-        "file": "gugu_dan.ckr",
+        "file": "examples/gugu_dan.ckr",
         "expected_snippet": "2 x 1 = 2",
         "description": "Gugu-Dan Multiplication Table"
     }
@@ -52,7 +52,7 @@ def verify():
             if expected in output:
                 print(f"  [PASS] Output contains '{expected}'")
                 # For Gugu-dan, check end too
-                if filename == "gugu_dan.ckr":
+                if filename == "examples/gugu_dan.ckr":
                     if "9 x 9 = 81" in output:
                          print(f"  [PASS] Output contains '9 x 9 = 81'")
                     else:

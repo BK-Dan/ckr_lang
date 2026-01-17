@@ -75,7 +75,7 @@ ckr --test
     - `욕망의조림인간` (IF >): 첫 번째 재료의 맛이 나머지보다 강하면 이동합니다.
 
 ## 예제 코드 (Examples)
-- `hello_world.ckr`: 기본적인 Hello World 출력
-- `hello_fun_world.ckr`: 좀더 난해하게 작성된 Hello World
-- `gugu_dan.ckr`: 2단부터 9단까지 구구단을 출력하는 프로그램
+- `examples/hello_world.ckr`: 기본적인 Hello World 출력
+- `examples/hello_fun_world.ckr`: 좀더 난해하게 작성된 Hello World
+- `examples/gugu_dan.ckr`: 2단부터 9단까지 구구단을 출력하는 프로그램
 
