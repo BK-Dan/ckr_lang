@@ -56,46 +56,95 @@ class CKRLexer:
         SUFFIX_KEYWORDS = {"조려", "조린다", "조리고", "앙", "을", "조림핑"}
         PREFIX_KEYWORD = "나야"
         
-        start_lines = [line.strip() for line in core_code.splitlines() if line.strip()]
+        # Flatten the entire code into a single stream of tokens
+        all_tokens = core_code.split()
         
         grouped_instructions = []
+        buffer = []
         
-        for line in start_lines:
-            tokens = line.split()
-            buffer = []
+        for i, token in enumerate(all_tokens):
             
-            for i, token in enumerate(tokens):
-                next_token = tokens[i+1] if i + 1 < len(tokens) else None
-                
-                # Case 1: Token is a Suffix -> End of Command
-                if token in SUFFIX_KEYWORDS:
-                    buffer.append(token)
+            # Case 0: Label Definition (startswith '연쇄조림마') -> Acts as a separator
+            if token.startswith("연쇄조림마"):
+                 if buffer:
+                     # Check for leftover buffer (e.g. '나야 A B')
+                     grouped_instructions.append(buffer)
+                     buffer = []
+                 grouped_instructions.append([token])
+                 continue
+
+            # Case 1: Token is '나야' -> Start of Command
+            if token == PREFIX_KEYWORD:
+                if buffer: 
+                    # If we have a previous unfinished buffer, flush it.
+                    # This happens if we have '나야 A B' then '나야 C D'
                     grouped_instructions.append(buffer)
-                    buffer = []
-                    
-                # Case 2: Token is '나야' -> Start of Command
-                elif token == PREFIX_KEYWORD:
-                    if buffer: # If we have a previous unfinished buffer, flush it (though likely invalid/orphan)
-                        grouped_instructions.append(buffer)
-                    buffer = [token]
-                    
-                # Case 3: Token is argument/variable
-                else:
-                    if next_token in SUFFIX_KEYWORDS:
-                        # LOOKAHEAD: If next token is a Suffix, this token belongs to that Suffix command.
-                        # If current buffer matches '나야', we must close the '나야' command now.
-                        if buffer and buffer[0] == PREFIX_KEYWORD:
-                             grouped_instructions.append(buffer)
-                             buffer = [token] # Start new buffer for the suffix command
-                        else:
-                             buffer.append(token)
-                    else:
-                        buffer.append(token)
-            
-            # Flush remaining buffer at end of line
-            if buffer:
-                grouped_instructions.append(buffer)
+                buffer = [token]
                 
+            # Case 2: Token is a Suffix -> End of Command
+            elif token in SUFFIX_KEYWORDS:
+                buffer.append(token)
+                
+                # COLLISION CHECK: If buffer started with '나야' and now ends with Suffix.
+                if buffer[0] == PREFIX_KEYWORD:
+                     # Buffer: [나야, arg1, arg2, ..., argN, Suffix]
+                     # We need to find where '나야' ends. 
+                     # Heuristic: '나야' consumes tokens until it finds one WITHOUT a comma.
+                     # Because CKR lists MUST be comma-separated. The last item of a list has no comma.
+                     
+                     na_ya_args = []
+                     suffix_args = []
+                     
+                     args = buffer[1:-1]
+                     split_idx = -1
+                     
+                     for idx, arg in enumerate(args):
+                         na_ya_args.append(arg)
+                         if not arg.endswith(","):
+                             split_idx = idx
+                             break
+                     
+                     if split_idx != -1 and split_idx < len(args) - 1:
+                         # We found a split point, and there are leftover args for the Suffix
+                         suffix_args = args[split_idx+1:]
+                         
+                         cmd1 = [PREFIX_KEYWORD] + na_ya_args
+                         grouped_instructions.append(cmd1)
+                         
+                         cmd2 = suffix_args + [token]
+                         grouped_instructions.append(cmd2)
+                     else:
+                         # No split point found (all had commas?) or no leftovers.
+                         # Assume all belong to '나야' (invalid syntax generally if Suffix is there, but let parser fail)
+                         # OR, maybe '나야' consumes everything and Suffix applies to the last one?
+                         # Actually, if we have [나야, A, B, 조려], and A has no comma.
+                         # Split at A. cmd1=[나야, A]. cmd2=[B, 조려]. 
+                         # If [나야, A, 조려]. Split at A. cmd1=[나야, A]. cmd2=[조려] (Invalid? Suffix needs target).
+                         # But let's stick to the split rule.
+                         if split_idx != -1: # Found a split
+                             cmd1 = [PREFIX_KEYWORD] + na_ya_args
+                             cmd2 = suffix_args + [token] # suffix_args is empty here
+                             grouped_instructions.append(cmd1)
+                             grouped_instructions.append(cmd2)
+                         else:
+                             # Fallback: Just dump the whole buffer? 
+                             # If we have [나야, A, B, 조려] and ALL have commas? 
+                             # Then '나야' takes A,B. '조려' takes... nothing?
+                             grouped_instructions.append(buffer)
+                else:
+                    # Normal Suffix command
+                    grouped_instructions.append(buffer)
+                
+                buffer = []
+                
+            # Case 3: Token is argument/variable
+            else:
+                buffer.append(token)
+        
+        # Flush remaining buffer (e.g. '나야 A B' at end of file)
+        if buffer:
+            grouped_instructions.append(buffer)
+            
         return grouped_instructions
 
 # --- 2. Parser ---
