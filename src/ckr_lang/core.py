@@ -82,7 +82,7 @@ class CKRLexer:
                 buffer = [token]
                 
             # Case 2: Token is a Suffix -> End of Command
-            elif token in SUFFIX_KEYWORDS:
+            elif token in SUFFIX_KEYWORDS or token.startswith("조림핑"):
                 buffer.append(token)
                 
                 # COLLISION CHECK: If buffer started with '나야' and now ends with Suffix.
