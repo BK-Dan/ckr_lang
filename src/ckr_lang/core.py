@@ -49,33 +49,78 @@ class CKRLexer:
 
     def tokenize(self, raw_code):
         core_code = self.clean_code(raw_code)
-        # Split by lines and strip whitespace
-        lines = [line.strip() for line in core_code.splitlines() if line.strip()]
-        return lines
+        
+        # Suffix keywords that end a command
+        # Note: "조림인간/욕망의조림인간" are part of "조림핑" construct, usually appearing before "조림핑". 
+        # But "조림핑" is the strict command ender.
+        SUFFIX_KEYWORDS = {"조려", "조린다", "조리고", "앙", "을", "조림핑"}
+        PREFIX_KEYWORD = "나야"
+        
+        start_lines = [line.strip() for line in core_code.splitlines() if line.strip()]
+        
+        grouped_instructions = []
+        
+        for line in start_lines:
+            tokens = line.split()
+            buffer = []
+            
+            for i, token in enumerate(tokens):
+                next_token = tokens[i+1] if i + 1 < len(tokens) else None
+                
+                # Case 1: Token is a Suffix -> End of Command
+                if token in SUFFIX_KEYWORDS:
+                    buffer.append(token)
+                    grouped_instructions.append(buffer)
+                    buffer = []
+                    
+                # Case 2: Token is '나야' -> Start of Command
+                elif token == PREFIX_KEYWORD:
+                    if buffer: # If we have a previous unfinished buffer, flush it (though likely invalid/orphan)
+                        grouped_instructions.append(buffer)
+                    buffer = [token]
+                    
+                # Case 3: Token is argument/variable
+                else:
+                    if next_token in SUFFIX_KEYWORDS:
+                        # LOOKAHEAD: If next token is a Suffix, this token belongs to that Suffix command.
+                        # If current buffer matches '나야', we must close the '나야' command now.
+                        if buffer and buffer[0] == PREFIX_KEYWORD:
+                             grouped_instructions.append(buffer)
+                             buffer = [token] # Start new buffer for the suffix command
+                        else:
+                             buffer.append(token)
+                    else:
+                        buffer.append(token)
+            
+            # Flush remaining buffer at end of line
+            if buffer:
+                grouped_instructions.append(buffer)
+                
+        return grouped_instructions
 
 # --- 2. Parser ---
 class CKRParser:
     """
-    Parses tokenized lines into instructions and labels.
+    Parses tokenized instruction lists into objects.
     """
-    def parse(self, lines):
+    def parse(self, instruction_groups):
         instructions = []
         labels = {}
         
-        for line in lines:
-            parts = line.split()
-            if not parts:
+        for tokens in instruction_groups:
+            if not tokens:
                 continue
             
+            line_str = " ".join(tokens)
+            
             # Label Handling: "연쇄조림마..."
-            if line.startswith("연쇄조림마"):
-                dots = line.replace("연쇄조림마", "").strip()
-                labels[dots] = len(instructions) # Point to the NEXT instruction index
-                # Labels are not executed as instructions in the PC flow, but we track index
+            if tokens[0].startswith("연쇄조림마"):
+                dots = tokens[0].replace("연쇄조림마", "").strip()
+                labels[dots] = len(instructions) 
                 continue
 
             # Instruction Parsing
-            instructions.append({'line': line, 'tokens': parts})
+            instructions.append({'line': line_str, 'tokens': tokens})
             
         return instructions, labels
 
